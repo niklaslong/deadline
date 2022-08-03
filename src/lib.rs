@@ -14,10 +14,11 @@ struct Fut<'a>(&'a dyn Fn() -> bool);
 impl<'a> Future for Fut<'a> {
     type Output = ();
 
-    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         if self.0() {
             Poll::Ready(())
         } else {
+            cx.waker().wake_by_ref();
             Poll::Pending
         }
     }
@@ -112,5 +113,26 @@ mod tests {
         deadline!(Duration::from_millis(10), move || {
             x.load(Ordering::Relaxed) == y
         });
+    }
+
+    #[tokio::test]
+    async fn it_only_waits_as_long_as_needed() {
+        let x = Arc::new(AtomicI32::new(41));
+        let y = 42;
+
+        let x_clone = x.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+            x_clone.fetch_add(1, Ordering::SeqCst);
+        });
+
+        let now = std::time::Instant::now();
+
+        deadline!(Duration::from_millis(1000), move || {
+            x.load(Ordering::Relaxed) == y
+        });
+
+        // Leave a bit of a gap, to avoid a flaky test.
+        assert!(now.elapsed() < Duration::from_millis(10));
     }
 }
