@@ -114,28 +114,3 @@ mod tests {
         });
     }
 }
-
-// async fn main() {
-//     use std::{
-//         sync::{
-//             atomic::{AtomicI32, Ordering},
-//             Arc,
-//         },
-//         time::Duration,
-//     };
-//
-//     use deadline::deadline;
-//
-//     let x = Arc::new(AtomicI32::new(41));
-//     let y = 42;
-//
-//     let x_clone = x.clone();
-//     tokio::spawn(async move {
-//         tokio::time::sleep(std::time::Duration::from_millis(5)).await;
-//         x_clone.fetch_add(1, Ordering::SeqCst);
-//     });
-//
-//     deadline!(Duration::from_millis(10), move || {
-//         x.load(Ordering::Relaxed) == y
-//     });
-// }
