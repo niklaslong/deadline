@@ -78,7 +78,17 @@ macro_rules! deadline {
                 .await
                 .is_ok(),
             "the deadline has elapsed for condition: {}",
-            stringify!($condition)
+            {
+                let normalized = stringify!($condition)
+                    .split_whitespace()
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                if let Some(wo_prefix) = normalized.strip_prefix("move || ") {
+                    wo_prefix.to_owned()
+                } else {
+                    normalized
+                }
+            }
         );
     }};
 }
@@ -91,7 +101,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    #[should_panic(expected = "the deadline has elapsed for condition: move || x == y")]
+    #[should_panic(expected = "the deadline has elapsed for condition: x == y")]
     async fn it_times_out() {
         let x = 1;
         let y = 2;
