@@ -2,8 +2,14 @@
 name = "deadline"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+authors = ["niklaslong <niklas@long.ch>"]
+description = "A one-macro crate to ensure assertions meet their deadlines."
+license = "MIT"
+repository = "https://github.com/niklaslong/deadline"
+documentation = "https://docs.rs/deadline"
+readme = "README.md"
+categories = ["asynchronous", "development-tools"]
+keywords = ["async", "testing", "macros"]
 
 [dependencies.tokio]
 version = "1.20.1"
