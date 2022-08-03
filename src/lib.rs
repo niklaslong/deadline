@@ -21,7 +21,8 @@ impl<'a> Future for Fut<'a> {
     }
 }
 
-async fn deadline_inner<F: Fn() -> bool + 'static>(
+#[doc(hidden)]
+pub async fn deadline_inner<F: Fn() -> bool + 'static>(
     wait_limit: Duration,
     condition: F,
 ) -> Result<(), Elapsed> {
