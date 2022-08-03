@@ -1,3 +1,5 @@
+//! A one-macro crate to ensure assertions meet their deadlines.
+
 use core::{
     future::Future,
     pin::Pin,
@@ -33,8 +35,8 @@ pub async fn deadline_inner<F: Fn() -> bool + 'static>(
 
 /// Requires a condition closure to return `true` before the specified duration has elapsed.
 ///
-/// This will invoke the [`panic!`] macro if the provided closure doesn't evaluate to `true` at
-/// runtime. Internally, it creates a [`Future`] from the closure that is polled until it returns
+/// This will panic if the provided closure doesn't evaluate to `true` before the provided duration
+/// expires. Internally, it creates a [`Future`] from the closure that is polled until it returns
 /// `true` or times out. This ensures the call is non-blocking to the async runtime.
 ///
 /// # Examples
