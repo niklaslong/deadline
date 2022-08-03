@@ -21,14 +21,27 @@ impl<'a> Future for Fut<'a> {
     }
 }
 
-/// Requires a condition closure to return `true` before the specified duration has elapsed.
-pub async fn deadline<F: Fn() -> bool + 'static>(wait_limit: Duration, condition: F) {
+async fn deadline_inner<F: Fn() -> bool + 'static>(
+    wait_limit: Duration,
+    condition: F,
+) -> Result<(), tokio::time::error::Elapsed> {
     let fut = Fut(&condition);
 
-    assert!(
-        timeout(wait_limit, fut).await.is_ok(),
-        "the deadline has elapsed",
-    );
+    timeout(wait_limit, fut).await
+}
+
+/// Requires a condition closure to return `true` before the specified duration has elapsed.
+#[macro_export]
+macro_rules! deadline {
+    ($wait_limit: expr, $condition: expr) => {{
+        assert!(
+            $crate::deadline_inner($wait_limit, $condition)
+                .await
+                .is_ok(),
+            "the deadline has elapsed for condition: {}",
+            stringify!($condition)
+        );
+    }};
 }
 
 #[cfg(test)]
@@ -39,14 +52,12 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    #[should_panic(expected = "the deadline has elapsed")]
+    #[should_panic(expected = "the deadline has elapsed for condition: move || x == y")]
     async fn it_times_out() {
         let x = 1;
         let y = 2;
 
-        let wait_limit = Duration::from_millis(1);
-
-        deadline(wait_limit, move || x == y).await;
+        deadline!(Duration::from_millis(1), move || x == y);
     }
 
     #[tokio::test]
@@ -60,9 +71,8 @@ mod tests {
             x_clone.fetch_add(1, Ordering::SeqCst);
         });
 
-        deadline(Duration::from_millis(10), move || {
+        deadline!(Duration::from_millis(10), move || {
             x.load(Ordering::Relaxed) == y
-        })
-        .await;
+        });
     }
 }
