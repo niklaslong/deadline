@@ -5,7 +5,7 @@ use core::{
     time::Duration,
 };
 
-use tokio::time::timeout;
+use tokio::time::{error::Elapsed, timeout};
 
 struct Fut<'a>(&'a dyn Fn() -> bool);
 
@@ -24,7 +24,7 @@ impl<'a> Future for Fut<'a> {
 async fn deadline_inner<F: Fn() -> bool + 'static>(
     wait_limit: Duration,
     condition: F,
-) -> Result<(), tokio::time::error::Elapsed> {
+) -> Result<(), Elapsed> {
     let fut = Fut(&condition);
 
     timeout(wait_limit, fut).await
