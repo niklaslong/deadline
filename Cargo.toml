@@ -1,6 +1,6 @@
 [package]
 name = "deadline"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["niklaslong <niklas@long.ch>"]
 description = "A one-macro crate to ensure assertions meet their deadlines."
