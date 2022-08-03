@@ -33,6 +33,9 @@ pub async fn deadline<F: Fn() -> bool + 'static>(wait_limit: Duration, condition
 
 #[cfg(test)]
 mod tests {
+    use core::sync::atomic::{AtomicI32, Ordering};
+    use std::sync::Arc;
+
     use super::*;
 
     #[tokio::test]
@@ -44,5 +47,22 @@ mod tests {
         let wait_limit = Duration::from_millis(1);
 
         deadline(wait_limit, move || x == y).await;
+    }
+
+    #[tokio::test]
+    async fn it_waits_until_true() {
+        let x = Arc::new(AtomicI32::new(41));
+        let y = 42;
+
+        let x_clone = x.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+            x_clone.fetch_add(1, Ordering::SeqCst);
+        });
+
+        deadline(Duration::from_millis(10), move || {
+            x.load(Ordering::Relaxed) == y
+        })
+        .await;
     }
 }
