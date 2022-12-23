@@ -29,9 +29,7 @@ pub async fn deadline_inner<F: Fn() -> bool + 'static>(
     wait_limit: Duration,
     condition: F,
 ) -> Result<(), Elapsed> {
-    let fut = Fut(&condition);
-
-    timeout(wait_limit, fut).await
+    timeout(wait_limit, Fut(&condition)).await
 }
 
 /// Requires a condition closure to return `true` before the specified duration has elapsed.
