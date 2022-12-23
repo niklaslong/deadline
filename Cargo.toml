@@ -12,9 +12,9 @@ categories = ["asynchronous", "development-tools"]
 keywords = ["async", "testing", "macros"]
 
 [dependencies.tokio]
-version = "1.20.1"
+version = "1.23"
 features = ["time"]
 
 [dev-dependencies.tokio]
-version = "1.20.1"
+version = "1.23"
 features = ["full"]
