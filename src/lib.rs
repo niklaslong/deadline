@@ -59,7 +59,7 @@ pub async fn deadline_inner<F: Fn() -> bool + 'static>(
 ///
 /// let x_clone = x.clone();
 /// tokio::spawn(async move {
-///     tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+///     tokio::time::sleep(Duration::from_millis(5)).await;
 ///     x_clone.fetch_add(1, Ordering::SeqCst);
 /// });
 ///
@@ -114,7 +114,7 @@ mod tests {
 
         let x_clone = x.clone();
         tokio::spawn(async move {
-            tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+            tokio::time::sleep(Duration::from_millis(5)).await;
             x_clone.fetch_add(1, Ordering::SeqCst);
         });
 
@@ -130,7 +130,7 @@ mod tests {
 
         let x_clone = x.clone();
         tokio::spawn(async move {
-            tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+            tokio::time::sleep(Duration::from_millis(5)).await;
             x_clone.fetch_add(1, Ordering::SeqCst);
         });
 
