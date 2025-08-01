@@ -1,7 +1,7 @@
 //! A one-macro crate to ensure assertions meet their deadlines.
 
 use core::{
-    future::Future,
+    future::{poll_fn, Future},
     pin::Pin,
     task::{Context, Poll},
     time::Duration,
@@ -9,7 +9,7 @@ use core::{
 
 use tokio::time::{error::Elapsed, timeout};
 
-struct Fut<'a>(&'a dyn Fn() -> bool);
+pub struct Fut<'a>(&'a dyn Fn() -> bool);
 
 impl<'a> Future for Fut<'a> {
     type Output = ();
@@ -88,6 +88,76 @@ macro_rules! deadline {
                 }
             }
         );
+    }};
+}
+
+/// The user never touches this; it's `doc(hidden)` so it
+/// only shows up in the macro expansion.
+#[doc(hidden)]
+pub async fn new_deadline_inner<'a, F>(wait_limit: Duration, condition: F) -> Result<(), Elapsed>
+where
+    F: Fn() -> bool + 'a,
+{
+    timeout(
+        wait_limit,
+        poll_fn(move |cx: &mut Context<'_>| {
+            if condition() {
+                Poll::Ready(())
+            } else {
+                // re-schedule ourselves
+                cx.waker().wake_by_ref();
+                Poll::Pending
+            }
+        }),
+    )
+    .await
+}
+
+/// Ergonomic macro: no `move` required on the user’s end,
+/// and we strip off the `||` for the panic message automatically.
+#[macro_export]
+macro_rules! new_deadline {
+    ($wait_limit:expr, $cond:expr) => {{
+        // create a zero-arg closure that borrows whatever `$cond` needs
+        let __cond = || $cond;
+        assert!(
+            $crate::new_deadline_inner($wait_limit, __cond)
+                .await
+                .is_ok(),
+            "the deadline has elapsed for condition: `{}`",
+            stringify!($cond)
+        );
+    }};
+}
+
+/// Hidden helper which polls your zero-arg closure until it returns `true`,
+/// re-waking the task each time it’s still `false`.
+#[doc(hidden)]
+pub async fn until_inner<'a, F>(condition: F)
+where
+    F: Fn() -> bool + 'a,
+{
+    poll_fn(move |cx: &mut Context<'_>| {
+        if condition() {
+            Poll::Ready(())
+        } else {
+            // schedule another poll immediately
+            cx.waker().wake_by_ref();
+            Poll::Pending
+        }
+    })
+    .await
+}
+
+/// Ergonomic macro: no `move ||` needed on the user side, and it
+/// just awaits until the condition is true.
+#[macro_export]
+macro_rules! until {
+    ($cond:expr) => {{
+        // capture whatever `$cond` needs by reference
+        let __cond = || $cond;
+        // drive the hidden future to completion
+        $crate::until_inner(__cond).await;
     }};
 }
 
