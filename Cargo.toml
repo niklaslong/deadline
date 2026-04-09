@@ -13,7 +13,7 @@ keywords = ["async", "testing", "macros"]
 
 [dependencies.tokio]
 version = "1.32"
-features = ["time"]
+features = ["time", "rt"]
 
 [dev-dependencies.tokio]
 version = "1.32"

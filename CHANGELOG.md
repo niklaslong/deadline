@@ -9,7 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Update `tokio` to `1.32`.
+- **Breaking:** `deadline!` now takes a boolean expression instead of a closure. Migration is mechanical — delete `move ||` from the second argument:
+
+  ```rust
+  // before
+  deadline!(Duration::from_millis(10), move || x.load(Ordering::Relaxed) == 42);
+  // after
+  deadline!(Duration::from_millis(10), x.load(Ordering::Relaxed) == 42);
+  ```
+
+- The internal condition helper now takes `FnMut` (was `Fn + 'static`), so conditions can mutate captured state and borrow non-`'static` data.
+- Polling loop rewritten as `while !cond { yield_now().await }`. Same non-blocking, minimum-latency behavior as before, expressed more directly.
+- Update `tokio` to `1.32` and enable the `rt` feature (required for `yield_now`).
 - Minor cosmetic refactors.
 
 ## [0.2.0]

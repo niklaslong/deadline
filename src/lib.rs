@@ -1,42 +1,28 @@
 //! A one-macro crate to ensure assertions meet their deadlines.
 
-use core::{
-    future::Future,
-    pin::Pin,
-    task::{Context, Poll},
-    time::Duration,
-};
+use core::time::Duration;
 
 use tokio::time::{error::Elapsed, timeout};
 
-struct Fut<'a>(&'a dyn Fn() -> bool);
-
-impl<'a> Future for Fut<'a> {
-    type Output = ();
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        if self.0() {
-            Poll::Ready(())
-        } else {
-            cx.waker().wake_by_ref();
-            Poll::Pending
-        }
-    }
-}
-
 #[doc(hidden)]
-pub async fn deadline_inner<F: Fn() -> bool + 'static>(
-    wait_limit: Duration,
-    condition: F,
-) -> Result<(), Elapsed> {
-    timeout(wait_limit, Fut(&condition)).await
+pub async fn deadline_inner<F>(wait_limit: Duration, mut condition: F) -> Result<(), Elapsed>
+where
+    F: FnMut() -> bool,
+{
+    timeout(wait_limit, async move {
+        while !condition() {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
 }
 
-/// Requires a condition closure to return `true` before the specified duration has elapsed.
+/// Requires a condition expression to evaluate to `true` before the specified duration has
+/// elapsed.
 ///
-/// This will panic if the provided closure doesn't evaluate to `true` before the provided duration
-/// expires. Internally, it creates a [`Future`] from the closure that is polled until it returns
-/// `true` or times out. This ensures the call is non-blocking to the async runtime.
+/// This will panic if the provided expression doesn't evaluate to `true` before the provided
+/// duration expires. Internally, the expression is re-checked after each cooperative yield to
+/// the runtime, so state changes are caught with minimal latency without blocking other tasks.
 ///
 /// # Examples
 ///
@@ -63,30 +49,21 @@ pub async fn deadline_inner<F: Fn() -> bool + 'static>(
 ///     x_clone.fetch_add(1, Ordering::SeqCst);
 /// });
 ///
-/// deadline!(Duration::from_millis(10), move || {
-///     x.load(Ordering::Relaxed) == y
-/// });
+/// deadline!(Duration::from_millis(10), x.load(Ordering::Relaxed) == y);
 /// # }
 /// ```
 #[macro_export]
 macro_rules! deadline {
-    ($wait_limit: expr, $condition: expr) => {{
+    ($wait_limit:expr, $condition:expr $(,)?) => {{
         assert!(
-            $crate::deadline_inner($wait_limit, $condition)
+            $crate::deadline_inner($wait_limit, || $condition)
                 .await
                 .is_ok(),
             "the deadline has elapsed for condition: {}",
-            {
-                let normalized = stringify!($condition)
-                    .split_whitespace()
-                    .collect::<Vec<_>>()
-                    .join(" ");
-                if let Some(wo_prefix) = normalized.strip_prefix("move || ") {
-                    wo_prefix.to_owned()
-                } else {
-                    normalized
-                }
-            }
+            stringify!($condition)
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ")
         );
     }};
 }
@@ -104,7 +81,7 @@ mod tests {
         let x = 1;
         let y = 2;
 
-        deadline!(Duration::from_millis(1), move || x == y);
+        deadline!(Duration::from_millis(1), x == y);
     }
 
     #[tokio::test]
@@ -118,9 +95,7 @@ mod tests {
             x_clone.fetch_add(1, Ordering::SeqCst);
         });
 
-        deadline!(Duration::from_millis(10), move || {
-            x.load(Ordering::Relaxed) == y
-        });
+        deadline!(Duration::from_millis(10), x.load(Ordering::Relaxed) == y);
     }
 
     #[tokio::test]
@@ -136,9 +111,7 @@ mod tests {
 
         let now = std::time::Instant::now();
 
-        deadline!(Duration::from_millis(1000), move || {
-            x.load(Ordering::Relaxed) == y
-        });
+        deadline!(Duration::from_millis(1000), x.load(Ordering::Relaxed) == y);
 
         // Leave a bit of a gap, to avoid a flaky test.
         assert!(now.elapsed() < Duration::from_millis(10));
